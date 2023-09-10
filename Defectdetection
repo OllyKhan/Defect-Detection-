@@ -1,0 +1,96 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage import io, exposure, measure, filters, morphology, color
+from scipy.optimize import curve_fit
+
+def calculate_and_plot_K_and_n(time, sizes, temperature):
+    lnT = np.log(time)
+    lnD = np.log(sizes)
+    
+    # Plot and calculate
+    plt.plot(lnT, lnD, 'o')
+    fit = np.polyfit(lnT, lnD, 1)
+    plt.plot(np.unique(lnT), np.poly1d(fit)(np.unique(lnT)))
+    n = fit[0]
+    lnK = fit[1] - np.log(sizes[0])
+    K = np.exp(lnK)
+    
+    plt.xlabel("lnT(s)")
+    plt.ylabel("lnD(m)")
+    plt.title(f"Graph of ln(T) against ln(D) for {temperature} degrees")
+    
+    return K, n
+
+def plot_inverse_temperature_vs_lnK(temps, K_values):
+    R = 8.31 # Universal gas constant in J/(mol·K)
+    InverseTemperature = [1/t for t in temps]
+    lnK = [np.log(k) for k in K_values]
+
+    # Plot and Fit
+    plt.plot(InverseTemperature, lnK, 'o')
+    fit = np.polyfit(InverseTemperature, lnK, 1)
+    plt.plot(np.unique(InverseTemperature), np.poly1d(fit)(np.unique(InverseTemperature)))
+    ActivationEnergy = (-fit[0] * R) / 1000  # Conversion to kJ/mol
+    k0 = np.exp(fit[1])
+
+    plt.xlabel("1/T(k^-1)")
+    plt.ylabel("lnK(cm^3mol^-1)")
+    plt.title("Graph of lnK vs InverseTemperature")
+
+    return ActivationEnergy, k0
+
+def analyze_microstructure_image(image_path):
+    # Load and display image
+    image = io.imread(image_path)
+    greyimage = color.rgb2gray(image)
+    edgeimage = filters.sobel(greyimage)
+    thresh = filters.threshold_otsu(edgeimage)
+    
+    thresh_edge = edgeimage > thresh
+    closed_edge = morphology.closing(thresh_edge, morphology.disk(3))
+    clean_edge = morphology.remove_small_objects(closed_edge, min_size=300)
+    thin_boundaries = morphology.skeletonize(clean_edge)
+    
+    # Further analysis and visualization can continue here
+
+    return thin_boundaries
+
+# Main execution
+if __name__ == "__main__":
+    time_values = [0, 5, 10, 15, 60, 120, 200]
+    grain_sizes_600 = [49.1, 42.3, 62.3, 60.7, 65.5, 71.6, 72.4]
+    grain_sizes_700 = [49.1, 72.8, 70.9, 81.2, 93.4, 95.4, 95.5]
+    grain_sizes_800 = [49.2, 80.0, 79.9, 95.0, 169.7, 175.2, 179.1]
+    
+    temperatures = [600, 700, 800]
+    grain_data = [grain_sizes_600, grain_sizes_700, grain_sizes_800]
+    
+    K_values = []
+    n_values = []
+
+    # Calculate K and n for each temperature
+    for t, sizes in zip(temperatures, grain_data):
+        K, n = calculate_and_plot_K_and_n(time_values, sizes, t)
+        K_values.append(K)
+        n_values.append(n)
+        print(f"The K value for {t} degrees is {K:.3f}")
+    
+    plt.figure()
+    ActivationEnergy, k0 = plot_inverse_temperature_vs_lnK(temperatures, K_values)
+    print(f"The activation energy in kilo-joules per mole is {ActivationEnergy:.3f}")
+    print(f"k0 is {k0:.3f}")
+
+    # Analyzing microstructure image
+    # Analyze microstructure image
+  image_path = 'path_to_image.jpg'
+  processed_image, grain_sizes, avg_size = analyze_microstructure_image(image_path)
+
+  # Print grain sizes and average size
+  print("Ordered Grain Sizes:", grain_sizes)
+  print("Average Grain Size:", avg_size)
+
+  # Display processed image
+  plt.imshow(processed_image, cmap='gray')
+  plt.show()
+    
+    plt.show()
